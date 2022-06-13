@@ -19,27 +19,34 @@ import src.utils as utils
 from src.fps import FPS
 from docs import config as cfg
 from src.redis_shmem import RedisShmem
+from vidgear.gears import WriteGear
 
 config_path = os.path.dirname(os.path.abspath(cfg.__file__))
 
 
 class RedisVideoCapture:
     def __init__(self, config):
-        print('\n[*] Initializing VideoCapture context') if int(config['defaultArgs']['--verbose']) == 2 else None
+        if int(config['defaultArgs']['--verbose']) == 1:
+            print('\n[*] Initializing VideoCapture context') 
         self.config               = config        
         self.src                  = config['defaultArgs']['--src']
         self.stream               = cv2.VideoCapture(self.src, cv2.CAP_FFMPEG)
         self.stopped              = False                       
         self.grabbed, self.frame  = False, None              
         self.fps                  = int(config['defaultArgs']['--fps'])
-        self.resolution           = int(config['defaultArgs']['--width']), int(config['defaultArgs']['--height'])
-        self.fpsTime              = 1 / float(self.fps) if self.fps != 0 else 0        
+        self.fpsTime              = 1 / float(self.fps) if self.fps != 0 else 0
+        self.fps_van              = int(config['stream']['fps_van'])
+        self.fpsTime_van          = 1 / float(self.fps_van) if self.fps_van != 0 else 0
+        self.resolution           = int(config['defaultArgs']['--width']), int(config['defaultArgs']['--height'])                
         self.frame_fail_cnt       = 0
         self.frame_fail_cnt_limit = 10     
         self.capture_failed       = False
         self.thread               = None
         self.shmem                = RedisShmem(config)
         self.verbose              = int(config['defaultArgs']['--verbose'])
+        self.__writer_param       = {"-vcodec":"libx264", "-crf": 0, "-preset": "fast"}
+        self.writer               = WriteGear(output_filename = 'Output.mp4', 
+                                    logging = True, compression_mode=True)#, **self.__writer_param)
         
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
@@ -53,6 +60,12 @@ class RedisVideoCapture:
         self.thread.start()
         return self
 
+    def waitOnFrameBuf(self):
+        """Wait until frame buffer is full"""
+        while(self.capture_failed != False and (self.shmem.qsize() < self.shmem.q_size)):
+            # 1/4 of FPS sleep
+            time.sleep(1.0 / (self.fps_van * 4)) if self.fps_van != 0 else time.sleep(0.1)
+        
 
     def update(self):          
         fps_log = FPS().start()
@@ -90,9 +103,13 @@ class RedisVideoCapture:
                     break          
                         
             # Try to keep FPS consistent
-            hvio.sleep_fps(tic, self.fpsTime) if self.fpsTime != 0 else 0
+            if self.fps != 0:
+                hvio.sleep_fps(tic, self.fpsTime)
+
+            # update FPS counter
             fps_log.update() 
-            if self.verbose == 1 and self.frame is not None:
+
+            if False and self.verbose == 1 and self.frame is not None:
                 print("[INFO] approx. stream reader  FPS: {:.2f}".format(fps_log.fps()))
         # end while
 
@@ -110,6 +127,7 @@ class RedisVideoCapture:
             print('[*] Stopping threaded video capturing') 
         self.stopped = True        
         self.stream.release()
+        self.writer.close()
         self.thread.join() 
 
 # ==================================
@@ -126,7 +144,7 @@ def main():
     args = cfg.merge(arguments, default_args)    
     verbose = int(args.verbose)
 
-    try:
+    if True: #try:
 
         # make the module unique to run on the same machine
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -136,19 +154,16 @@ def main():
         pid_path = config['process']['pidfilepath'] + config['process']['pidfilename'] + '.pid'
         utils.write_pid_file(pid_path)
 
-        # start the service
-        if verbose == 2:
-            print('[*] Starting service')
-    
+        # set variables
         import itertools
         c = itertools.count(0)
         frameID = next(c)
-        
         stop_bit = True
-        
-        fps_van = config['stream']['fps_van']
-        fpsTime = 1 / float(fps_van) if fps_van != 0 else 0        
 
+        # start the service
+        if verbose == 2:
+            print('[*] Starting service')       
+        
         while stop_bit: 
             
             # initialize the video capture and start the thread 
@@ -158,22 +173,34 @@ def main():
             # start the FPS logger
             fps_log = FPS().start()
             
+            # start the video reader main loop
             while capture.stream.isOpened(): 
                 tic = time.time()
                 # get the frame from the buffer                
-                _, grabbed, timestamp = capture.read()
+                frame, grabbed, timestamp = capture.read()
+
+                # wait until frame buffer is full
+                capture.waitOnFrameBuf()
+
                 if grabbed == True:
-                    frameID = next(c)
+                    frameID = next(c) # increment frame ID
                     if verbose == 2:
                         print(f'{frameID}-th frame grabbed @ {timestamp} and Q_size: {capture.shmem.qsize()}')
 
-                if frameID >= 2000:
-                    capture.stop()
+                # write the frame to the video file
+                if frame is not None and frameID in range(100, 200):
+                    capture.writer.write(frame)
+                elif frame is not None and frameID in range(300, 400):
+                    capture.writer.write(frame)
+                 
+
+                if frameID >= 500:                    
                     stop_bit = False
                     break
 
                 # Try to keep FPS consistent
-                hvio.sleep_fps(tic, fpsTime)
+                if capture.fps_van != 0:
+                    hvio.sleep_fps(tic, capture.fpsTime_van)
 
                 # update the FPS logger
                 fps_log.update()
@@ -184,7 +211,8 @@ def main():
 
             # stop the services
             capture.stop()
-            fps_log.stop()
+            fps_log.stop()                      
+            
             time.sleep(1)
             capture = None
             
@@ -193,7 +221,7 @@ def main():
         time.sleep(3)
         print('By')
 
-    except:
+    else: #except:
         print("Process already running. Exiting")
         time.sleep(1)
         sys.exit(0)
