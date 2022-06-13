@@ -1,7 +1,7 @@
 """
 Usage:
   config.py [--file=<file_path-path>] [--width=<pixel>] 
-            [--height=<pixel>] [--fps=<int-fps>]
+            [--height=<pixel>] [--fps_rdg=<int-fps>]
             [--stream_name=<stream-name>] [--service_name=<service-name>] 
   config.py -h | --help | --version
 
@@ -33,9 +33,9 @@ class RedisVideoCapture:
         self.stream               = cv2.VideoCapture(self.src, cv2.CAP_FFMPEG)
         self.stopped              = False                       
         self.grabbed, self.frame  = False, None              
-        self.fps                  = int(config['defaultArgs']['--fps'])
-        self.fpsTime              = 1 / float(self.fps) if self.fps != 0 else 0
-        self.fps_van              = int(config['stream']['fps_van'])
+        self.fps_rdg              = int(config['defaultArgs']['--fps_rdg'])
+        self.fpsTime_rdg          = 1 / float(self.fps_rdg) if self.fps_rdg != 0 else 0
+        self.fps_van              = int(config['Analysis']['fps_van'])
         self.fpsTime_van          = 1 / float(self.fps_van) if self.fps_van != 0 else 0
         self.resolution           = int(config['defaultArgs']['--width']), int(config['defaultArgs']['--height'])                
         self.frame_fail_cnt       = 0
@@ -103,8 +103,8 @@ class RedisVideoCapture:
                     break          
                         
             # Try to keep FPS consistent
-            if self.fps != 0:
-                hvio.sleep_fps(tic, self.fpsTime)
+            if self.fps_rdg != 0:
+                hvio.sleep_fps(tic, self.fpsTime_rdg)
 
             # update FPS counter
             fps_log.update() 
