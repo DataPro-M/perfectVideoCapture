@@ -7,12 +7,14 @@ import src.utils as utils
 
 
 class RedisShmem(object):
-    def __init__(self, config):
-        self.__db = utils.connect_redis(
-            config['redis']['host'], int(config['redis']['port']))
-        self.Q_name = config['APP']['cam_name']
-        self.key = '%s:%s' % ('namespace', self.Q_name)
-        self.q_size = 64
+    def __init__(self, cfg):
+        self.__db    = utils.connect_redis(
+                        cfg['redis']['host'], 
+                        int(cfg['redis']['port']))
+        self.Q_name  = cfg['APP']['cam_name']
+        self.key     = '%s:%s' % ('namespace', self.Q_name)
+        self.fps_van = int(cfg['Analysis']['fps_van']) if int(cfg['Analysis']['fps_van']) != 0 else 12
+        self.q_size  = int(cfg['Analysis']['buf_sec']) * self.fps_van
 
     def qsize(self):
         """Return the approximate size of the queue."""
