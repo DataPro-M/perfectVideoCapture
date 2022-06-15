@@ -1,9 +1,10 @@
 """
 Usage:
-  config.py [--file=<file_path-path>] [--width=<pixel>] 
-            [--height=<pixel>] [--fps_rdg=<int-fps>]
-            [--stream_name=<stream-name>] [--service_name=<service-name>] 
-  config.py -h | --help | --version
+  videoio.py [--src=<RTSP-url or file-path>] 
+             [--width=<pixel>] [--height=<pixel>] 
+             [--fps_rdg=<int reading-frames-fps>]
+             [--verbose=<verbose mode>] 
+  videoio.py -h | --help | --version
 
 """
 from docopt import docopt
@@ -21,10 +22,13 @@ from src.fps import FPS
 from docs import config as cfg
 from src.redis_shmem import RedisShmem
 from src.video_writer import video_writer
+import faulthandler
 
+# ==================================
+faulthandler.enable()
 config_path = os.path.dirname(os.path.abspath(cfg.__file__))
 
-
+# RedisVideoCapture class
 class RedisVideoCapture:
     def __init__(self, cfg):
         if int(cfg['defaultArgs']['--verbose']) == 1:
@@ -62,14 +66,17 @@ class RedisVideoCapture:
         return self
 
     def waitOnFrameBuf(self):
-        """Wait until frame buffer is full"""
+        """Wait until the frame buffer is full """
         while(not self.capture_failed and (self.shmem.qsize() < self.shmem.q_size)):
             # 1/4 of FPS sleep
             time.sleep(1.0 / (self.fps_van * 4)) if self.fps_van != 0 else time.sleep(0.1)
         
 
-    def update(self):          
+    def update(self):
+        # start the FPS timer         
         fps_log = FPS().start()
+
+        # loop over some frames and estimate the FPS
         while self.started:			
 
             tic = time.time()  
@@ -114,8 +121,7 @@ class RedisVideoCapture:
                 print("[INFO] approx. stream reader  FPS: {:.2f}".format(fps_log.fps()))
         # end while
 
-        # release the video source
-        self.stream.release()
+        # stop the FPS timer 
         fps_log.stop()
                 
     # get the frame from the buffer
@@ -149,9 +155,9 @@ def main():
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.bind('\0' + config['process']['processname'])
 
-        # write the pid file
-        pid_path = config['process']['pidfilepath'] + config['process']['pidfilename'] + '.pid'
-        utils.write_pid_file(pid_path)
+        # # write the pid file
+        # pid_path = config['process']['pidfilepath'] + config['process']['pidfilename'] + '.pid'
+        # utils.write_pid_file(pid_path)
 
         # set variables
         import itertools
@@ -183,7 +189,7 @@ def main():
                 # get the frame from the buffer                
                 frame, grabbed, timestamp = cap.read()  
 
-                # wait until frame buffer is full
+                # Wait until the frame buffer is full 
                 cap.waitOnFrameBuf()
 
                 if grabbed:
@@ -245,10 +251,6 @@ def main():
     except:
         print("Process already running. Exiting")
         time.sleep(1)
-        sys.exit(0)
-
-    finally:
-        print('By bye')
         sys.exit(0)
 
 
