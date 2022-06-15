@@ -20,44 +20,40 @@ import src.utils as utils
 from src.fps import FPS
 from docs import config as cfg
 from src.redis_shmem import RedisShmem
-# from vidgear.gears import WriteGear
 from src.video_writer import video_writer
 
 config_path = os.path.dirname(os.path.abspath(cfg.__file__))
 
 
 class RedisVideoCapture:
-    def __init__(self, config):
-        if int(config['defaultArgs']['--verbose']) == 1:
-            print('\n[*] Initializing VideoCapture context') 
-        self.config               = config        
-        self.src                  = config['defaultArgs']['--src']
+    def __init__(self, cfg):
+        if int(cfg['defaultArgs']['--verbose']) == 1:
+            print('\n[INFO] Initializing VideoCapture context') 
+        self.src                  = cfg['defaultArgs']['--src']
         self.stream               = cv2.VideoCapture(self.src, cv2.CAP_FFMPEG)
-        self.started              = False                       
-        self.grabbed, self.frame  = False, None              
-        self.fps_rdg              = int(config['defaultArgs']['--fps_rdg'])
+        self.shmem                = RedisShmem(cfg)
+        self.verbose              = int(cfg['defaultArgs']['--verbose'])        
+        self.writer               = video_writer(cfg)
+        self.rec_permit           = cfg['record']['rec_permit']                      
+        self.fps_rdg              = int(cfg['defaultArgs']['--fps_rdg'])
         self.fpsTime_rdg          = 1 / float(self.fps_rdg) if self.fps_rdg != 0 else 0
-        self.fps_van              = int(config['Analysis']['fps_van']) if int(config['Analysis']['fps_van']) != 0 else 12
+        self.fps_van              = int(cfg['Analysis']['fps_van']) if int(cfg['Analysis']['fps_van']) != 0 else 12
         self.fpsTime_van          = 1 / float(self.fps_van) if self.fps_van != 0 else 0
-        self.resolution           = int(config['defaultArgs']['--width']), int(config['defaultArgs']['--height'])                
+        self.resolution           = int(cfg['defaultArgs']['--width']), int(cfg['defaultArgs']['--height'])                
         self.frame_fail_cnt       = 0
         self.frame_fail_cnt_limit = 10     
         self.capture_failed       = False
         self.thread               = None
-        self.shmem                = RedisShmem(config)
-        self.verbose              = int(config['defaultArgs']['--verbose'])
-        #self.__writer_param       = {"-vcodec":"libx264", "-crf": 0, "-preset": "fast"}
-        #self.writer               = WriteGear(output_filename = 'Output.mp4', 
-        #                            logging = True, compression_mode=True)#, **self.__writer_param)
-        self.writer               = video_writer(config)
-        self.rec_permit           = config['record']['rec_permit']
+        self.started              = False                       
+        self.grabbed, self.frame  = False, None
+        
         
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
 
     def start(self): 
         if self.verbose == 2:
-            print('[*] Starting threaded video capturing')       
+            print('[INFO] Starting threaded video capturing')       
         self.started = True        
         # start the thread to read frames from the video stream         
         self.thread = threading.Thread(target=self.update, args=())
@@ -104,7 +100,7 @@ class RedisVideoCapture:
                     self.capture_failed = True
 
                     if self.verbose == 2:
-                        print('[*] Capture failed, exiting') 
+                        print('[INFO] Capture failed, exiting') 
                     break          
                         
             # Try to keep FPS consistent
@@ -114,7 +110,7 @@ class RedisVideoCapture:
             # update FPS counter
             fps_log.update() 
 
-            if False and self.verbose == 1 and self.frame is not None:
+            if self.verbose == 1 and self.frame is not None:
                 print("[INFO] approx. stream reader  FPS: {:.2f}".format(fps_log.fps()))
         # end while
 
@@ -129,7 +125,7 @@ class RedisVideoCapture:
     def stop(self):
         # indicate that the thread should be stopped
         if self.verbose == 2:
-            print('[*] Stopping threaded video capturing') 
+            print('[INFO] Stopping threaded video capturing') 
         self.started = False        
         self.stream.release()        
         self.thread.join() 
@@ -148,8 +144,7 @@ def main():
     args = cfg.merge(arguments, default_args)    
     verbose = int(args.verbose)
 
-    if True: #try:
-
+    try:
         # make the module unique to run on the same machine
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.bind('\0' + config['process']['processname'])
@@ -163,13 +158,11 @@ def main():
         c = itertools.count(0)
         frameID = next(c)
         stop_bit = True
-        rec_event = False
-        font = cv2.FONT_HERSHEY_SIMPLEX 
-        color = (100, 255, 0)
+        rec_event = False        
 
         # start the service
         if verbose == 2:
-            print('[*] Starting service')       
+            print('[INFO] Starting service')       
         
         while stop_bit: 
             
@@ -188,11 +181,7 @@ def main():
                     break
 
                 # get the frame from the buffer                
-                frame, grabbed, timestamp = cap.read()
-
-                # print the frameID                
-                cv2.putText(frame, str(frameID), (7, 70), font, 3, color, 3, cv2.LINE_AA)
-
+                frame, grabbed, timestamp = cap.read()  
 
                 # wait until frame buffer is full
                 cap.waitOnFrameBuf()
@@ -226,21 +215,19 @@ def main():
                     print("[INFO] approx. video analitic FPS: {:.2f}".format(fps_log.fps()))
 
                 # Some dummy conditions!
-
-                # recording event
+                ## recording event
                 if frameID in range(100, 200):
                     if not rec_event:
                         rec_event = True
 
-                # recording event finished
+                ## recording event finished
                 elif rec_event and frameID > 200:
                     rec_event = False
 
-                # exiting the loop        
+                ## Loop exiting condition         
                 elif frameID >= 300:                    
                     stop_bit = False
                     break
-
             # end while
 
             # stop the services
@@ -251,14 +238,19 @@ def main():
             cap = None
             
 
-        print("[*] Exiting service")      
+        print("[INFO] Exiting service")      
         time.sleep(3)
         print('By')
 
-    else: #except:
+    except:
         print("Process already running. Exiting")
         time.sleep(1)
         sys.exit(0)
+
+    finally:
+        print('By bye')
+        sys.exit(0)
+
 
 if __name__ == '__main__':
     main()

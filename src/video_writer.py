@@ -1,8 +1,7 @@
 """
-Created on Apr 12, 2017
-@author: sgoldsmith
-Copyright (c) Steven P. Goldsmith
-All rights reserved.
+Inspired by:
+    @author: sgoldsmith
+    Copyright (c) Steven P. Goldsmith. 
 """
 
 import numpy
@@ -15,10 +14,7 @@ from queue import Queue # thread safe queue
 
 
 class ffmpegwriter():
-    """Video writer based on ffmpeg-python.
-
-    Encode single numpy image as video frame.
-    """
+    """Video writer based on ffmpeg-python"""
 
     def __init__(self, fileName, vcodec, fps, frameWidth, frameHeight):
         self.process = (
@@ -57,6 +53,7 @@ class video_writer():
         self.file_ext      = cfg['record']['rec_file_ext']
         self.vcodec        = cfg['record']['vcodec']        
         self.bufSize       = int(cfg['record']['rec_buf_sec']) * self.fps
+        self.verbose       = int(cfg['defaultArgs']['--verbose'])
         self.timeout       = 0.01
         self.frame_Q       = deque(maxlen=self.bufSize)
         self.videoFileName = None
@@ -72,7 +69,9 @@ class video_writer():
 
     def makeFileName(self, timestamp, name):
         "Create file name based on image timestamp"
-        print("Creating file name")
+
+        if self.verbose == 2:
+            print("[INFO] Creating file name")
 
         # Construct directory name from camera name, recordDir and date
         dateStr = timestamp.strftime("%Y-%m-%d")
@@ -100,7 +99,9 @@ class video_writer():
 
     def recStart(self, timestamp, name):
         "Start recording video"
-        print("Starting recording")
+
+        if self.verbose == 2:
+            print("[INFO] Starting recording")
 
         # Start recording
         self.recStarted = True
@@ -129,11 +130,13 @@ class video_writer():
 
     def writeFrames(self):
         "Write frames to video file"
-        print("Writing frames")
+
+        if self.verbose == 2:
+            print("[INFO] Writing frames")
 
         while self.recStarted:
             # check to see if there are entries in the queue
-            if self.Q.qsize() > self.bufSize:
+            if self.Q.qsize() >= self.bufSize:
                 # grab the next frame
                 frame = self.Q.get()
                 self.writer.write(frame)
@@ -143,7 +146,10 @@ class video_writer():
 
     def flush(self):
         "Flush frames in queue"
-        print(f"Flushing {self.Q.qsize()} frames\n")
+
+        if self.verbose == 2:
+            print(f"[INFO] Flushing {self.Q.qsize()} frames")
+
         # empty the queue by flushing all remaining frames to file
         while not self.Q.empty():
             frame = self.Q.get()
@@ -151,7 +157,10 @@ class video_writer():
 
     def recStop(self):
         "Stop recording video"
-        print("Stopping recording")
+
+        if self.verbose == 2:
+            print("[INFO] Stopping recording")
+
         # indicating that we have completed our recording,
         # Join the thread, then flush all remaining frames 
         # in the queue to file and free the writer pointer. 
