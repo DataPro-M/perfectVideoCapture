@@ -28,7 +28,6 @@ class RedisShmem(object):
         """Put item into the queue."""
         encoded = self.encodeFrame(item)
         self.__db.rpush(self.key, encoded)
-        #print(f'[*] Queue size: {self.qsize()}')
         if self.qsize() > self.q_size:
             self.__db.lpop(self.key)
 
@@ -47,7 +46,7 @@ class RedisShmem(object):
     def separate_image_timestamp(image_byte):
         timestamp = ''
         s = False if image_byte == None else True
-        if s == True:
+        if s:
             timestamp = image_byte[:26].decode()
             image_byte = image_byte[26:]
         return timestamp, image_byte, s
@@ -73,7 +72,7 @@ class RedisShmem(object):
         time_img_bytes = self.get_Q(1)
         timestamp, img_bytes, grabbed = self.separate_image_timestamp(time_img_bytes)
 
-        if grabbed == True:        
+        if grabbed:        
             frame = self.decodeFrame(img_bytes) 
         else:
             frame = None 
