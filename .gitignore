@@ -1,9 +1,15 @@
 # exlude following directories and files
 __pycache__/
 .idea/
-*.pyc 
+*.pyc
 *.txt
 *.pdf
 *.mp4
 *.avi
 *.fuse_*
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/

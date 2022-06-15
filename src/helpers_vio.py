@@ -1,9 +1,11 @@
 import time
 
 
-'''
+"""
 sleep elapsed time based on fps
-'''
+"""
+
+
 def sleep_fps(start, fpsTime):
     curTime = time.time()
     elapsed = curTime - start
