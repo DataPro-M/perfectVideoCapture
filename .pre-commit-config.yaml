@@ -4,9 +4,18 @@ repos:
     hooks:
     -   id: trailing-whitespace
     -   id: end-of-file-fixer
+    -   id: check-docstring-first
     -   id: check-yaml
     -   id: check-added-large-files
+-   repo: https://gitlab.com/pycqa/flake8
+    rev: 3.9.2
+    hooks:
+    -   id: flake8
 -   repo: https://github.com/ambv/black
     rev: 22.3.0
     hooks:
     -   id: black
+-   repo: https://github.com/pre-commit/mirrors-isort
+    rev: v5.10.1
+    hooks:
+    -   id: isort

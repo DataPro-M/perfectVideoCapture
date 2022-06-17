@@ -1,36 +1,43 @@
-"""
-Usage:
-  videoio.py [--src=<RTSP-url or file-path>]
-             [--width=<pixel>] [--height=<pixel>]
-             [--fps_rdg=<int reading-frames-fps>]
-             [--verbose=<verbose mode>]
-  videoio.py -h | --help | --version
+#!/usr/bin/env python3
+
+"""Perfect video Capture module.
+
+Usage:   videoio.py [--src=<RTSP-url or file-path>]
+                        [--width=<pixel>] [--height=<pixel>]
+                        [--fps_rdg=<int reading-frames-fps>]
+                        [--verbose=<verbose mode>]
+
+            videoio.py -h | --help | --version
 
 """
-from docopt import docopt
-import time
+
+import datetime
+import faulthandler
+import os
 import socket
 import sys
-import os
-import datetime
 import threading
+import time
+
 import cv2
-import numpy as np
+from docopt import docopt
+
 import src.helpers_vio as hvio
-import src.utils as utils
-from src.fps import FPS
 from docs import config as cfg
+from src.fps import FPS
 from src.redis_shmem import RedisShmem
 from src.video_writer import video_writer
-import faulthandler
 
 # ==================================
 faulthandler.enable()
 config_path = os.path.dirname(os.path.abspath(cfg.__file__))
 
-# RedisVideoCapture class
+
 class RedisVideoCapture:
+    """RedisVideoCapture class."""
+
     def __init__(self, cfg):
+        """Initialize the video capture context."""
         if int(cfg["defaultArgs"]["--verbose"]) == 1:
             print("\n[INFO] Initializing VideoCapture context")
         self.src = cfg["defaultArgs"]["--src"]
@@ -58,9 +65,11 @@ class RedisVideoCapture:
         self.grabbed, self.frame = False, None
 
     def __str__(self):
+        """Print the video capture context."""
         return str(self.__class__) + ": " + str(self.__dict__)
 
     def start(self):
+        """Start the thread to read frames from the video stream."""
         if self.verbose == 2:
             print("[INFO] Starting threaded video capturing")
         self.started = True
@@ -71,7 +80,7 @@ class RedisVideoCapture:
         return self
 
     def waitOnFrameBuf(self):
-        """Wait until the frame buffer is full"""
+        """Wait until the frame buffer is full."""
         while not self.capture_failed and (self.shmem.qsize() < self.shmem.q_size):
             # 1/4 of FPS sleep
             time.sleep(1.0 / (self.fps_van * 4)) if self.fps_van != 0 else time.sleep(
@@ -79,6 +88,7 @@ class RedisVideoCapture:
             )
 
     def update(self):
+        """Update the video capture context."""
         # start the FPS timer
         fps_log = FPS().start()
 
@@ -124,7 +134,7 @@ class RedisVideoCapture:
             fps_log.update()
 
             if self.verbose == 1 and self.frame is not None:
-                print("[INFO] approx. stream reader  FPS: {:.2f}".format(fps_log.fps()))
+                print(f"[INFO] approx. stream reader  FPS: {fps_log.fps():.2f}")
         # end while
 
         # stop the FPS timer
@@ -132,10 +142,11 @@ class RedisVideoCapture:
 
     # get the frame from the buffer
     def read(self):
+        """Get the frame from the buffer."""
         return self.shmem.getFrame()
 
     def stop(self):
-        # indicate that the thread should be stopped
+        """Stop the video capture context."""
         if self.verbose == 2:
             print("[INFO] Stopping threaded video capturing")
         self.started = False  # set flag to stop thread
@@ -144,9 +155,10 @@ class RedisVideoCapture:
 
 
 # ==================================
-## main function
+# main function
 # ==================================
 def main():
+    """Implement the main function."""
     arguments = docopt(__doc__, version="0.1.1rc")
 
     # read the config file
@@ -161,10 +173,6 @@ def main():
         # make the module unique to run on the same machine
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.bind("\0" + config["process"]["processname"])
-
-        # # write the pid file
-        # pid_path = config['process']['pidfilepath'] + config['process']['pidfilename'] + '.pid'
-        # utils.write_pid_file(pid_path)
 
         # set variables
         import itertools
@@ -191,7 +199,7 @@ def main():
             while cap.stream.isOpened():
                 tic = time.time()
 
-                if cap.capture_failed:
+                if cap.capture_failed and cap.shmem.empty():
                     break
 
                 # get the frame from the buffer
@@ -204,7 +212,8 @@ def main():
                     frameID = next(c)  # increment frame ID
                     if verbose == 2:
                         print(
-                            f"{frameID}-th frame grabbed @ {timestamp} and Q_size: {cap.shmem.qsize()}"
+                            f"{frameID}-th frame grabbed @ {timestamp}"
+                            f" and Q_size: {cap.shmem.qsize()}"
                         )
 
                 # if permited to record
@@ -228,23 +237,19 @@ def main():
                 # update the FPS logger
                 fps_log.update()
                 if verbose == 1:
-                    print(
-                        "[INFO] approx. video analitic FPS: {:.2f}".format(
-                            fps_log.fps()
-                        )
-                    )
+                    print(f"[INFO] approx. video analitic FPS: {fps_log.fps():.2f}")
 
                 # Some dummy conditions!
-                ## recording event
+                # recording event
                 if frameID in range(100, 200):
                     if not rec_event:
                         rec_event = True
 
-                ## recording event finished
+                # recording event finished
                 elif rec_event and frameID > 200:
                     rec_event = False
 
-                ## Loop exiting condition
+                # Loop exiting condition
                 elif frameID >= 300:
                     stop_bit = False
                     break
@@ -261,8 +266,9 @@ def main():
         time.sleep(3)
         print("By")
 
-    except:
-        print("Process already running. Exiting")
+    except socket.error as msg:
+        print("Process already running.")
+        print(str(msg) + "\n" + "Exiting")
         time.sleep(1)
         sys.exit(0)
 

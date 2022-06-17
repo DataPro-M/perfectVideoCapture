@@ -1,29 +1,27 @@
-"""
-Inspired by:
-    @author: sgoldsmith
-    Copyright (c) Steven P. Goldsmith.
-"""
+"""Video writer class."""
 
-import numpy
-import ffmpeg
-import threading
 import os
+import threading
 import time
 from collections import deque  # efficient queue data structure
 from queue import Queue  # thread safe queue
 
+import ffmpeg
+import numpy
+
 
 class ffmpegwriter:
-    """Video writer based on ffmpeg-python"""
+    """Video writer based on ffmpeg-python."""
 
     def __init__(self, fileName, vcodec, fps, frameWidth, frameHeight):
+        """Initialize the ffmpeg writer."""
         self.process = (
             ffmpeg.input(
                 "pipe:",
-                framerate="{}".format(fps),
+                framerate=f"{fps}",
                 format="rawvideo",
                 pix_fmt="bgr24",
-                s="{}x{}".format(frameWidth, frameHeight),
+                s=f"{frameWidth}x{frameHeight}",
             )
             .output(
                 fileName, vcodec=vcodec, pix_fmt="nv21", acodec="n", **{"b:v": 2000000}
@@ -34,11 +32,11 @@ class ffmpegwriter:
         )
 
     def write(self, image):
-        """Convert raw image format to something ffmpeg understands"""
+        """Convert raw image format to something ffmpeg understands."""
         self.process.stdin.write(image.astype(numpy.uint8).tobytes())
 
     def close(self):
-        """Clean up resources"""
+        """Clean up resources."""
         self.process.stdin.close()
         self.process.wait()
 
@@ -47,6 +45,7 @@ class video_writer:
     """Video writer class."""
 
     def __init__(self, cfg):
+        """Initialize video writer."""
         self.cfg = cfg
         self.fps = int(self.cfg["record"]["fps_rec"])
         self.frameWidth = int(cfg["defaultArgs"]["--width"])
@@ -70,8 +69,7 @@ class video_writer:
         return len(self.frame_Q)
 
     def makeFileName(self, timestamp, name):
-        "Create file name based on image timestamp"
-
+        """Create file name based on image timestamp."""
         if self.verbose == 2:
             print("[INFO] Creating file name")
 
@@ -79,7 +77,7 @@ class video_writer:
         dateStr = timestamp.strftime("%Y-%m-%d")
         fileDir = "%s/%s/%s" % (os.path.expanduser(self.recDir), self.cam_name, dateStr)
 
-        # Create dir if it doesn"t exist
+        # Create dir if it doesn't exist
         if not os.path.exists(fileDir):
             os.makedirs(fileDir)
 
@@ -88,7 +86,7 @@ class video_writer:
         return "%s/%s" % (fileDir, fileName)
 
     def update(self, frame):
-        "Write frames to video file"
+        """Write frames to video file."""
         self.frame_Q.appendleft(frame)
 
         # if we are recording, update the queue as well
@@ -96,8 +94,7 @@ class video_writer:
             self.Q.put(frame)
 
     def recStart(self, timestamp, name):
-        "Start recording video"
-
+        """Start recording video."""
         if self.verbose == 2:
             print("[INFO] Starting recording")
 
@@ -128,8 +125,7 @@ class video_writer:
         self.thread.start()
 
     def writeFrames(self):
-        "Write frames to video file"
-
+        """Write frames to video file."""
         if self.verbose == 2:
             print("[INFO] Writing frames")
 
@@ -144,8 +140,7 @@ class video_writer:
                 time.sleep(self.timeout)
 
     def flush(self):
-        "Flush frames in queue"
-
+        """Flush frames in queue."""
         if self.verbose == 2:
             print(f"[INFO] Flushing {self.Q.qsize()} frames")
 
@@ -155,8 +150,7 @@ class video_writer:
             self.writer.write(frame)
 
     def recStop(self):
-        "Stop recording video"
-
+        """Stop recording video."""
         if self.verbose == 2:
             print("[INFO] Stopping recording")
 
