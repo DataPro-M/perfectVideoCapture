@@ -3,7 +3,7 @@
 import time
 
 
-def sleep_fps(start, fpsTime):
+def sleep_fps(start: float, fpsTime: float) -> None:
     """Sleep elapsed time based on fps."""
     curTime = time.time()
     elapsed = curTime - start

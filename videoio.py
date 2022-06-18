@@ -2,10 +2,10 @@
 
 """Perfect video Capture module.
 
-Usage:   videoio.py [--src=<RTSP-url or file-path>]
+Usage:   videoio.py [--src=<RTSP-url>]
                         [--width=<pixel>] [--height=<pixel>]
-                        [--fps_rdg=<int reading-frames-fps>]
-                        [--verbose=<verbose mode>]
+                        [--fps_rdg=<int>]
+                        [--verbose=<int>]
 
             videoio.py -h | --help | --version
 
@@ -90,7 +90,8 @@ class RedisVideoCapture:
     def update(self):
         """Update the video capture context."""
         # start the FPS timer
-        fps_log = FPS().start()
+        fps_log = FPS()
+        fps_log.start()
 
         # loop over some frames and estimate the FPS
         while self.started:
@@ -167,7 +168,8 @@ def main():
 
     # merge the arguments with the config file
     args = cfg.merge(arguments, default_args)
-    verbose = int(args.verbose)
+    print(args)
+    verbose = int(args["--verbose"])
 
     try:
         # make the module unique to run on the same machine
@@ -193,12 +195,15 @@ def main():
             cap.start()
 
             # start the FPS logger
-            fps_log = FPS().start()
+            fps_log = FPS()
+            fps_log.start()
+            print(fps_log)
 
             # start the video reader main loop
             while cap.stream.isOpened():
                 tic = time.time()
 
+                # Wait until the shared memory is empty if capture fails.
                 if cap.capture_failed and cap.shmem.empty():
                     break
 
@@ -208,6 +213,7 @@ def main():
                 # Wait until the frame buffer is full
                 cap.waitOnFrameBuf()
 
+                # if the frame is grabbed, process it
                 if grabbed:
                     frameID = next(c)  # increment frame ID
                     if verbose == 2:

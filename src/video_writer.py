@@ -4,16 +4,20 @@ import os
 import threading
 import time
 from collections import deque  # efficient queue data structure
+from datetime import datetime
 from queue import Queue  # thread safe queue
+from typing import Deque, Dict
 
 import ffmpeg
-import numpy
+import numpy as np
 
 
 class ffmpegwriter:
     """Video writer based on ffmpeg-python."""
 
-    def __init__(self, fileName, vcodec, fps, frameWidth, frameHeight):
+    def __init__(
+        self, fileName: str, vcodec: str, fps: int, frameWidth: int, frameHeight: int
+    ) -> None:
         """Initialize the ffmpeg writer."""
         self.process = (
             ffmpeg.input(
@@ -31,11 +35,11 @@ class ffmpegwriter:
             .run_async(pipe_stdin=True)
         )
 
-    def write(self, image):
+    def write(self, image: np.ndarray) -> None:
         """Convert raw image format to something ffmpeg understands."""
-        self.process.stdin.write(image.astype(numpy.uint8).tobytes())
+        self.process.stdin.write(image.astype(np.uint8).tobytes())
 
-    def close(self):
+    def close(self) -> None:
         """Clean up resources."""
         self.process.stdin.close()
         self.process.wait()
@@ -44,7 +48,7 @@ class ffmpegwriter:
 class video_writer:
     """Video writer class."""
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Dict[str, Dict[str, str]]) -> None:
         """Initialize video writer."""
         self.cfg = cfg
         self.fps = int(self.cfg["record"]["fps_rec"])
@@ -57,18 +61,18 @@ class video_writer:
         self.bufSize = int(cfg["record"]["rec_buf_sec"]) * self.fps
         self.verbose = int(cfg["defaultArgs"]["--verbose"])
         self.timeout = 0.01
-        self.frame_Q = deque(maxlen=self.bufSize)
-        self.videoFileName = None
+        self.frame_Q: Deque[np.ndarray] = deque(maxlen=self.bufSize)
+        self.Q: Queue[np.ndarray] = Queue()
+        self.videoFileName = ""
         self.writer = None
-        self.Q = None
         self.thread = None
         self.recStarted = False
 
-    def qsize(self):
+    def qsize(self) -> int:
         """Return the approximate size of the queue."""
         return len(self.frame_Q)
 
-    def makeFileName(self, timestamp, name):
+    def makeFileName(self, timestamp: datetime, name: str) -> str:
         """Create file name based on image timestamp."""
         if self.verbose == 2:
             print("[INFO] Creating file name")
@@ -85,7 +89,7 @@ class video_writer:
         fileName = "%s-%s.%s" % (name, timestamp.strftime("%H-%M-%S"), self.file_ext)
         return "%s/%s" % (fileDir, fileName)
 
-    def update(self, frame):
+    def update(self, frame: np.ndarray) -> None:
         """Write frames to video file."""
         self.frame_Q.appendleft(frame)
 
@@ -93,7 +97,7 @@ class video_writer:
         if self.recStarted:
             self.Q.put(frame)
 
-    def recStart(self, timestamp, name):
+    def recStart(self, timestamp: datetime, name: str) -> None:
         """Start recording video."""
         if self.verbose == 2:
             print("[INFO] Starting recording")
@@ -112,7 +116,7 @@ class video_writer:
             fps=self.fps,
             frameWidth=self.frameWidth,
             frameHeight=self.frameHeight,
-        )
+        )  # type: ignore
 
         # loop over the frames in the deque structure and add them
         # to the queue
@@ -120,11 +124,12 @@ class video_writer:
             self.Q.put(self.frame_Q[i - 1])
 
         # Start thread to write frames
-        self.thread = threading.Thread(target=self.writeFrames)
-        self.thread.daemon = True  # like the garbage collection task
-        self.thread.start()
+        self.thread = threading.Thread(target=self.writeFrames)  # type: ignore
+        # like the garbage collection task
+        self.thread.daemon = True  # type: ignore
+        self.thread.start()  # type: ignore
 
-    def writeFrames(self):
+    def writeFrames(self) -> None:
         """Write frames to video file."""
         if self.verbose == 2:
             print("[INFO] Writing frames")
@@ -134,12 +139,12 @@ class video_writer:
             if self.Q.qsize() >= self.bufSize:
                 # grab the next frame
                 frame = self.Q.get()
-                self.writer.write(frame)
+                self.writer.write(frame)  # type: ignore
             # otherwise, wait for a bit (not wasting CPU cycles)
             else:
                 time.sleep(self.timeout)
 
-    def flush(self):
+    def flush(self) -> None:
         """Flush frames in queue."""
         if self.verbose == 2:
             print(f"[INFO] Flushing {self.Q.qsize()} frames")
@@ -147,9 +152,9 @@ class video_writer:
         # empty the queue by flushing all remaining frames to file
         while not self.Q.empty():
             frame = self.Q.get()
-            self.writer.write(frame)
+            self.writer.write(frame)  # type: ignore
 
-    def recStop(self):
+    def recStop(self) -> None:
         """Stop recording video."""
         if self.verbose == 2:
             print("[INFO] Stopping recording")

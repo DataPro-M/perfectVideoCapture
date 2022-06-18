@@ -2,6 +2,7 @@
 
 import datetime
 import struct
+from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -12,7 +13,7 @@ import src.utils as utils
 class RedisShmem(object):
     """RedisShmem class."""
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Dict[str, Dict[str, str]]) -> None:
         """Initialize the RedisShmem context."""
         self.__db = utils.connect_redis(cfg["redis"]["host"], int(cfg["redis"]["port"]))
         self.Q_name = cfg["APP"]["cam_name"]
@@ -24,34 +25,34 @@ class RedisShmem(object):
         )
         self.q_size = int(cfg["Analysis"]["buf_sec"]) * self.fps_van
 
-    def qsize(self):
+    def qsize(self) -> int:
         """Return the approximate size of the queue."""
         return self.__db.llen(self.key)
 
-    def empty(self):
+    def empty(self) -> bool:
         """Return True if the queue is empty, False otherwise."""
         return self.qsize() == 0
 
-    def put_Q(self, item):
+    def put_Q(self, frame: np.ndarray):
         """Put item into the queue."""
-        encoded = self.encodeFrame(item)
+        encoded = self.encodeFrame(frame)
         self.__db.rpush(self.key, encoded)
         if self.qsize() > self.q_size:
             self.__db.lpop(self.key)
 
-    def get_Q(self, timeout=None):
+    def get_Q(self, timeout: Optional[int] = None) -> bytes:
         """Get item from the queue."""
-        item = self.__db.blpop(self.key, timeout=timeout)
-        if item:
-            item = item[1]
-        return item
+        key, item_bytes = self.__db.blpop(self.key, timeout=timeout)
+        return item_bytes
 
-    def resizeFrame(self, frame, resolution=(860, 480)):
+    def resizeFrame(
+        self, frame: np.ndarray, resolution: Tuple[int, int] = (860, 480)
+    ) -> np.ndarray:
         """Resize frame to resolution."""
         return cv2.resize(frame, resolution)
 
     @staticmethod
-    def separate_image_timestamp(image_byte):
+    def separate_image_timestamp(image_byte: bytes) -> Tuple[str, bytes, bool]:
         """Separate image timestamp from image bytes."""
         timestamp = ""
         s = False if image_byte is None else True
@@ -61,7 +62,7 @@ class RedisShmem(object):
         return timestamp, image_byte, s
 
     @staticmethod
-    def encodeFrame(img):
+    def encodeFrame(img: np.ndarray) -> bytes:
         """Encode frame to bytes."""
         h, w = img.shape[:2]
         shape = struct.pack(">II", h, w)
@@ -71,7 +72,7 @@ class RedisShmem(object):
         return encoded
 
     @staticmethod
-    def decodeFrame(encoded):
+    def decodeFrame(encoded: bytes) -> np.ndarray:
         """Decode frame from bytes."""
         h, w = struct.unpack(">II", encoded[:8])
         decoded_image = np.frombuffer(encoded, dtype=np.uint8, offset=8).reshape(
@@ -79,7 +80,7 @@ class RedisShmem(object):
         )
         return decoded_image
 
-    def getFrame(self):
+    def getFrame(self) -> Tuple[Optional[np.ndarray], bool, str]:
         """Get frame from the queue."""
         time_img_bytes = self.get_Q(1)
         timestamp, img_bytes, grabbed = self.separate_image_timestamp(time_img_bytes)
