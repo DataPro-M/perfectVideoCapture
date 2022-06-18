@@ -6,8 +6,7 @@ from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
-
-import src.utils as utils
+import utils.helpers as hvio
 
 
 class RedisShmem(object):
@@ -15,7 +14,7 @@ class RedisShmem(object):
 
     def __init__(self, cfg: Dict[str, Dict[str, str]]) -> None:
         """Initialize the RedisShmem context."""
-        self.__db = utils.connect_redis(cfg["redis"]["host"], int(cfg["redis"]["port"]))
+        self.__db = hvio.connect_redis(cfg["redis"]["host"], int(cfg["redis"]["port"]))
         self.Q_name = cfg["APP"]["cam_name"]
         self.key = "%s:%s" % ("namespace", self.Q_name)
         self.fps_van = (

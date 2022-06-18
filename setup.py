@@ -22,7 +22,8 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    package_dir={"": "src"},
-    packages=setuptools.find_packages(where="src"),
+    package_dir={"videoio"},
+    packages=setuptools.find_packages(where="videoio"),
     python_requires=">=3.8",
+    entry_points={"console_scripts": ["videoio = videoio.demo:main"]},
 )

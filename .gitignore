@@ -8,6 +8,7 @@ __pycache__/
 *.avi
 *.fuse_*
 *.sqlite3
+*.mypy_cache
 
 # Distribution / packaging
 .Python
