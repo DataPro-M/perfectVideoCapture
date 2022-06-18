@@ -10,7 +10,7 @@ setuptools.setup(
     version="0.1.1rc",
     author="DataPro",
     author_email="m.komijani@gmail.com",
-    description="Perfect RTSP/video-file capture",
+    description="Perfect RTSP video capture",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/DataPro-M/perfectVideoCapture",
@@ -22,8 +22,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    package_dir={"videoio"},
-    packages=setuptools.find_packages(where="videoio"),
+    packages=["videoio"],
     python_requires=">=3.8",
     entry_points={"console_scripts": ["videoio = videoio.demo:main"]},
 )
