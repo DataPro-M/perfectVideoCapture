@@ -33,7 +33,7 @@ class RedisShmem(object):
         """Return True if the queue is empty, False otherwise."""
         return self.qsize() == 0
 
-    def put_Q(self, frame: np.ndarray):
+    def put_Q(self, frame: np.ndarray) -> None:
         """Put item into the queue."""
         encoded = self.encodeFrame(frame)
         self.__db.rpush(self.key, encoded)

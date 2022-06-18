@@ -18,8 +18,10 @@ import socket
 import sys
 import threading
 import time
+from typing import Dict, Optional, Tuple
 
 import cv2
+import numpy as np
 from docopt import docopt
 
 import src.helpers_vio as hvio
@@ -36,7 +38,7 @@ config_path = os.path.dirname(os.path.abspath(cfg.__file__))
 class RedisVideoCapture:
     """RedisVideoCapture class."""
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Dict) -> None:
         """Initialize the video capture context."""
         if int(cfg["defaultArgs"]["--verbose"]) == 1:
             print("\n[INFO] Initializing VideoCapture context")
@@ -62,24 +64,22 @@ class RedisVideoCapture:
         self.capture_failed = False
         self.thread = None
         self.started = False
-        self.grabbed, self.frame = False, None
+        self.grabbed, self.frame = self.stream.read()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Print the video capture context."""
         return str(self.__class__) + ": " + str(self.__dict__)
 
-    def start(self):
+    def start(self) -> None:
         """Start the thread to read frames from the video stream."""
         if self.verbose == 2:
             print("[INFO] Starting threaded video capturing")
         self.started = True
         # start the thread to read frames from the video stream
-        self.thread = threading.Thread(target=self.update, args=())
-        self.thread.daemon = False  # thread will stop when main thread stops
-        self.thread.start()
-        return self
+        self.thread = threading.Thread(target=self.update, args=())  # type: ignore
+        self.thread.start()  # type: ignore
 
-    def waitOnFrameBuf(self):
+    def waitOnFrameBuf(self) -> None:
         """Wait until the frame buffer is full."""
         while not self.capture_failed and (self.shmem.qsize() < self.shmem.q_size):
             # 1/4 of FPS sleep
@@ -87,7 +87,7 @@ class RedisVideoCapture:
                 0.1
             )
 
-    def update(self):
+    def update(self) -> None:
         """Update the video capture context."""
         # start the FPS timer
         fps_log = FPS()
@@ -142,23 +142,23 @@ class RedisVideoCapture:
         fps_log.stop()
 
     # get the frame from the buffer
-    def read(self):
+    def read(self) -> Tuple[Optional[np.ndarray], bool, str]:
         """Get the frame from the buffer."""
         return self.shmem.getFrame()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the video capture context."""
         if self.verbose == 2:
             print("[INFO] Stopping threaded video capturing")
         self.started = False  # set flag to stop thread
-        self.thread.join()  # wait for thread to finish
+        self.thread.join()  # type: ignore # wait for thread to finish
         self.stream.release()  # release video stream
 
 
 # ==================================
 # main function
 # ==================================
-def main():
+def main() -> None:
     """Implement the main function."""
     arguments = docopt(__doc__, version="0.1.1rc")
 
@@ -168,7 +168,6 @@ def main():
 
     # merge the arguments with the config file
     args = cfg.merge(arguments, default_args)
-    print(args)
     verbose = int(args["--verbose"])
 
     try:
@@ -197,7 +196,6 @@ def main():
             # start the FPS logger
             fps_log = FPS()
             fps_log.start()
-            print(fps_log)
 
             # start the video reader main loop
             while cap.stream.isOpened():

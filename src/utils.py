@@ -6,7 +6,7 @@ import redis  # type: ignore
 from redis.client import Redis  # type: ignore
 
 
-def write_pid_file(pid_file: str):
+def write_pid_file(pid_file: str) -> None:
     """Write the pid file."""
     with open(pid_file, "w") as f:
         f.write(str(os.getpid()))
