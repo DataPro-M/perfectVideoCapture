@@ -88,8 +88,6 @@ class RedisVideoCapture:
             self.frame_fail_cnt = 0
             self.capture_failed = True
             break_flag = True
-            if self.verbose == 2:
-                print("[INFO] Capture failed, exiting")
         return break_flag
 
     def update(self) -> None:
@@ -114,6 +112,8 @@ class RedisVideoCapture:
             else:
                 break_flag = self.update_failed()
                 if break_flag:
+                    if self.verbose == 2:
+                        print("[INFO] Capture failed, exiting")
                     break
 
             # Try to keep FPS consistent
