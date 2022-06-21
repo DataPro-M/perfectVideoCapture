@@ -13,6 +13,7 @@ Usage:   videoio.py [--src=<RTSP-url>]
 
 import datetime
 import faulthandler
+import itertools
 import os
 import socket
 import sys
@@ -22,7 +23,7 @@ import utils.helpers as hvio
 from docopt import docopt
 from utils.fps import FPS
 
-from videoio import RedisVideoCapture
+from videoio import RedisVideoCapture  # type: ignore
 
 lib_path = os.path.abspath(os.path.join(__file__, "..", "..", ""))
 sys.path.append(lib_path)
@@ -54,8 +55,6 @@ def main() -> None:
         s.bind("\0" + config["process"]["processname"])
 
         # set variables
-        import itertools
-
         c = itertools.count(0)
         frameID = next(c)
         stop_bit = True

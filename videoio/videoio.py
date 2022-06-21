@@ -64,6 +64,34 @@ class RedisVideoCapture:
                 0.1
             )
 
+    def update_grabbed(self, frame: np.ndarray) -> None:
+        """Update context if the frame is grabbed."""
+        # resize frame to resolution
+        self.frame = self.shmem.resizeFrame(frame, self.resolution)
+
+        # put frame into buffer
+        self.shmem.put_Q(self.frame)
+
+        if self.frame_fail_cnt > 0:
+            self.frame_fail_cnt = 0  # reset counter
+
+        if not self.capture_failed:
+            self.capture_failed = False
+
+    def update_failed(self) -> bool:
+        """Update the video capture context if the frame is failed."""
+        break_flag = False
+        # if the frame is failed, increment the counter
+        self.frame_fail_cnt += 1
+        # if the frame is failed for more than 10 times, stop the video capture
+        if self.frame_fail_cnt > self.frame_fail_cnt_limit:
+            self.frame_fail_cnt = 0
+            self.capture_failed = True
+            break_flag = True
+            if self.verbose == 2:
+                print("[INFO] Capture failed, exiting")
+        return break_flag
+
     def update(self) -> None:
         """Update the video capture context."""
         # start the FPS timer
@@ -72,7 +100,7 @@ class RedisVideoCapture:
 
         # loop over some frames and estimate the FPS
         while self.started:
-
+            # get timestamp
             tic = time.time()
 
             # Get frame from the video source
@@ -80,28 +108,12 @@ class RedisVideoCapture:
 
             # If we have successfully grabbed a frame.
             if self.grabbed:
+                self.update_grabbed(frame)
 
-                # resize frame to resolution
-                self.frame = self.shmem.resizeFrame(frame, self.resolution)
-
-                # put frame into buffer
-                self.shmem.put_Q(self.frame)
-
-                if self.frame_fail_cnt > 0:
-                    self.frame_fail_cnt = 0  # reset counter
-
-                if not self.capture_failed:
-                    self.capture_failed = False
-
-            # If we failed to grab a frame, increment the counter.
+            # If we failed to grab a frame
             else:
-                self.frame_fail_cnt += 1
-                if self.frame_fail_cnt > self.frame_fail_cnt_limit:
-                    self.frame_fail_cnt = 0
-                    self.capture_failed = True
-
-                    if self.verbose == 2:
-                        print("[INFO] Capture failed, exiting")
+                break_flag = self.update_failed()
+                if break_flag:
                     break
 
             # Try to keep FPS consistent
