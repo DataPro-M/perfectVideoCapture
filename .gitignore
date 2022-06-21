@@ -47,7 +47,7 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # tox working folder
-/.tox
+*tox
 
 # Unit test / coverage reports
 htmlcov/
