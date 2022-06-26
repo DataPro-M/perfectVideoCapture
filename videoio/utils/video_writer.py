@@ -146,13 +146,14 @@ class video_writer:
 
     def flush(self) -> None:
         """Flush frames in queue."""
-        if self.verbose == 2:
-            print(f"[INFO] Flushing {self.Q.qsize()} frames")
-
         # empty the queue by flushing all remaining frames to file
+        flush_size = self.Q.qsize()
         while not self.Q.empty():
             frame = self.Q.get()
             self.writer.write(frame)  # type: ignore
+        if self.verbose == 2:
+            print(f"[INFO] {flush_size} frames flushed")
+        self.writer.close()  # type: ignore
 
     def recStop(self) -> None:
         """Stop recording video."""
@@ -166,5 +167,7 @@ class video_writer:
         if self.thread is not None:
             self.thread.join()
         if self.writer is not None:
-            self.flush()
-            self.writer.close()
+            # Start thread to write frames
+            self.thread = threading.Thread(target=self.flush)  # type: ignore
+            self.thread.daemon = True  # type: ignore
+            self.thread.start()  # type: ignore
